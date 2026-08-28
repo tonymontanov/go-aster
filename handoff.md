@@ -76,10 +76,14 @@ Done ✅
   tests on doc fixtures. `go test ./... -race` clean.
 - doc.go, README.md, examples/quickstart.
 
-In progress 🔧
-- sleipnir-trading-core connector (branch `aster-connector` from `qa`):
-  section id `aster_futures` (+ `aster_futures_testnet`), package
-  `internal/connectors/aster/futures/`.
+Done (desk side) ✅
+- sleipnir-trading-core connector shipped on branch `aster-connector`
+  (from `qa`): section ids `aster_futures` / `aster_futures_testnet`,
+  packages `internal/connectors/aster/{common,futures}`, rate-limiter
+  strategy, wiring, `cmd/aster-live` harness. Uses this SDK at v0.1.0.
+- SDK v1.1 candidate: expose a user-data reconnect hook so the desk
+  connector can re-seed WatchOpenOrders state after SDK-internal
+  reconnects (currently covered by OBM periodic REST sync).
 
 Planned 📋
 - Live validation on testnet — BLOCKED: no API wallet yet (user has neither
