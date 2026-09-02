@@ -101,10 +101,11 @@ Done ✅
 - futures: Trading/Account/MarketData/Stream + user data stream + contract
   tests on doc fixtures. `go test ./... -race` clean.
 - doc.go, README.md, examples/quickstart.
-- 2026-09-02 post-live fixes (uncommitted, on top of v0.1.0):
+- v1.0.0 (2026-09-02, PR #1) — post-live fixes on top of v0.1.0:
   internal/codec CaseSensitive (root cause of all WS parse failures),
   Config.ChainID defaults 1666/714 by Testnet (+ exported DefaultChainID /
-  TestnetChainID), `-5050` → ErrorKindAuth, tests: config_test.go,
+  TestnetChainID), `-5050` → ErrorKindAuth, IsUnknownOrder predicate
+  (-2011/-2013, idempotent cancels on the desk), tests: config_test.go,
   internal/codec/json_test.go, internal/asterr/errors_test.go,
   futures/stream_parse_test.go (official WS fixtures for all 8 event types),
   SymbolInfo.PriceDecimals()/QuantityDecimals() + symbol-info_test.go
@@ -120,9 +121,9 @@ Done (desk side) ✅
 - sleipnir-trading-core connector shipped on branch `aster-connector`
   (from `qa`): section ids `aster_futures` / `aster_futures_testnet`,
   packages `internal/connectors/aster/{common,futures}`, rate-limiter
-  strategy, wiring, `cmd/aster-live` harness. Uses this SDK at v0.1.0.
-- Desk credentials convention CHANGED 2026-09-02 (uncommitted on branch
-  aster-connector): `api_key` = API wallet address (→ Config.Signer,
+  strategy, wiring, `cmd/aster-live` harness. Uses this SDK at v1.0.0.
+- Desk credentials convention CHANGED 2026-09-02 (branch aster-connector,
+  merged to qa): `api_key` = API wallet address (→ Config.Signer,
   validated against the key), `secret_key` = API wallet private key,
   `passphrase` = master wallet address (→ Config.User, optional). The
   previous mapping (api_key = master wallet) was the root cause of the
@@ -132,10 +133,8 @@ Done (desk side) ✅
   reconnects (currently covered by OBM periodic REST sync).
 
 Planned 📋
-- Commit the 2026-09-02 fixes and tag v1.0.0 once the desk strategy runs
-  stably on mainnet (user's call); then switch sleipnir go.mod from the
-  TEMPORARY local replace (currently present, uncommitted) to the tag —
-  CI forbids committed replace directives.
+- (done 2026-09-02) v1.0.0 tagged after the desk's full strategy run;
+  sleipnir go.mod depends on the tag, no local replace.
 - Testnet run (chainId 714, fstream vs fstream5 host) — needs a dedicated
   testnet API wallet (www.asterdex-testnet.com → Pro API); the current
   ASTER_FUTURES_TESTNET_* env values are mainnet placeholders.
