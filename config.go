@@ -23,6 +23,8 @@ Production Aster hosts are used by default:
 Testnet (Config.Testnet = true):
   - REST futures: https://fapi.asterdex-testnet.com
   - WS futures:   wss://fstream.asterdex-testnet.com
+  - EIP-712 chainId 714 instead of the production 1666 (different signing
+    domains per the official docs; an explicit Config.ChainID always wins).
 
 AUTHENTICATION (V3 API Wallet / Agent model):
 Aster V3 does not use API key + HMAC. Credentials are:
@@ -38,7 +40,20 @@ Standard library:
 
 package aster
 
-import "time"
+import (
+	"time"
+
+	"github.com/tonymontanov/go-aster/internal/auth"
+)
+
+// EIP-712 signing-domain chainIds (single source of truth: internal/auth).
+// Re-exported so applications can pin them explicitly in Config.ChainID.
+const (
+	// DefaultChainID — chainId of the production signing domain.
+	DefaultChainID int64 = auth.DefaultChainID
+	// TestnetChainID — chainId of the testnet signing domain.
+	TestnetChainID int64 = auth.TestnetChainID
+)
 
 // Aster transport URLs. Declared as vars rather than const so tests can
 // override them (e.g. to point at a mock server).
@@ -70,8 +85,11 @@ type Config struct {
 	// PrivateKey — API wallet private key, hex with optional 0x prefix.
 	// Empty → the client can only access public endpoints.
 	PrivateKey string
-	// ChainID — EIP-712 signing domain chainId. Default: 1666 (per Aster V3
-	// docs, same for mainnet and testnet trading endpoints).
+	// ChainID — EIP-712 signing domain chainId. Default: DefaultChainID
+	// (1666, production) or TestnetChainID (714) when Testnet is set and
+	// ChainID is left 0. The two environments use DIFFERENT signing domains
+	// (official V3 docs): a 1666 signature is rejected by the testnet with
+	// -1022 INVALID_SIGNATURE.
 	ChainID int64
 
 	// REST — REST transport settings. If empty, DefaultConfig().REST is used.
@@ -187,7 +205,7 @@ type OrderbookConfig struct {
 // (production endpoints + production timeouts).
 func DefaultConfig() Config {
 	return Config{
-		ChainID: 1666,
+		ChainID: DefaultChainID,
 		REST: RestConfig{
 			FuturesBaseURL:      DefaultFuturesRestURL,
 			RequestTimeout:      10 * time.Second,
@@ -225,8 +243,13 @@ func DefaultConfig() Config {
 func (c Config) withDefaults() Config {
 	var def Config = DefaultConfig()
 
+	// ChainID: the testnet trading API signs with a different EIP-712 domain
+	// (714) than production (1666). An explicit ChainID always wins.
 	if c.ChainID == 0 {
 		c.ChainID = def.ChainID
+		if c.Testnet {
+			c.ChainID = TestnetChainID
+		}
 	}
 
 	// Endpoints: for Testnet use *-testnet hosts by default. If the user

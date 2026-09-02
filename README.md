@@ -6,7 +6,7 @@ High-performance Go SDK for the [Aster DEX](https://www.asterdex.com) V3 API, bu
 
 | Version | Scope | State |
 | ------- | ----- | ----- |
-| v1.x | Futures section (USD-M perpetuals, `/fapi/v3`): REST + WS + orderbook engine | in development |
+| v1.x | Futures section (USD-M perpetuals, `/fapi/v3`): REST + WS + orderbook engine | live-validated on mainnet (REST, market WS, user-data WS, place/modify/cancel) |
 | v2.x | Spot section (`/api/v3`) | planned |
 | v2.5 | Advanced endpoints (chase, strategy orders, guarded cancel, Noop, sub-accounts) | planned |
 
@@ -21,7 +21,8 @@ Requires Go 1.24+.
 ## Authentication (V3 API Wallet / Agent model)
 
 Aster V3 does not use API key + HMAC. Every private request is signed with an
-**EIP-712** typed-data signature (domain `AsterSignTransaction`, chainId 1666)
+**EIP-712** typed-data signature (domain `AsterSignTransaction`, chainId 1666
+on mainnet / 714 on testnet — selected automatically by `Config.Testnet`)
 produced by an **API wallet** (agent) private key:
 
 - `User` — master account wallet address;
@@ -30,6 +31,10 @@ produced by an **API wallet** (agent) private key:
 
 Create an API wallet at <https://www.asterdex.com/en/api-wallet> (switch to
 *Pro API*). Testnet wallets: <https://www.asterdex-testnet.com/en/api-wallet>.
+
+Since 2026-09-01 every authenticated endpoint requires the master wallet to
+have completed a deposit; until then the exchange answers
+`-5050 DEPOSIT_REQUIRED` (mapped to `ErrorKindAuth`, non-retryable).
 
 The signing implementation is pure Go (`x/crypto` Keccak-256 +
 `dcrd/secp256k1` deterministic ECDSA) and is verified byte-for-byte against
@@ -116,7 +121,10 @@ chain-style builders. All prices/quantities are `shopspring/decimal`.
 - rate-limit usage (`X-MBX-USED-WEIGHT-*`, `X-MBX-ORDER-COUNT-*`) is exposed
   per call and via `Config.RateLimitEventObserver`;
 - errors carry a category (`Network`/`RateLimit`/`Auth`/`InvalidRequest`/
-  `Exchange`) plus the raw exchange code for `errors.As` inspection.
+  `Exchange`) plus the raw exchange code for `errors.As` inspection;
+- JSON decoding is case-sensitive: the wire format distinguishes `e`/`E`,
+  `U`/`u`, `b`/`B`, `s`/`S`, so a case-insensitive parser silently breaks
+  every stream (pinned by fixture tests in `futures/stream_parse_test.go`).
 
 ## Testing
 

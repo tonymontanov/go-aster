@@ -14,7 +14,8 @@ Aster error codes follow the Binance Futures convention: negative integers in a
   - 11xx — request issues (validation);
   - 20xx — processing issues (order rejected, balance, etc.);
   - 40xx — filters and other issues;
-  - 42xx — V3-specific (e.g. -4225 Nonce Expired).
+  - 42xx — V3-specific (e.g. -4225 Nonce Expired);
+  - 50xx — deposit/withdrawal (e.g. -5050 DEPOSIT_REQUIRED).
 
 See also: errors.go in the root (re-export).
 */
@@ -104,6 +105,26 @@ func IsInvalidRequest(err error) bool { return matchKind(err, ErrorKindInvalidRe
 // IsExchange returns true if err has category Exchange.
 func IsExchange(err error) bool { return matchKind(err, ErrorKindExchange) }
 
+// Order-lookup rejection codes (Binance Futures convention, copied by Aster):
+//   - -2011 UNKNOWN_ORDER — cancel/modify of an order the engine no longer
+//     holds (already filled, cancelled or never accepted);
+//   - -2013 NO_SUCH_ORDER — query of an order that does not exist.
+const (
+	CodeUnknownOrder int64 = -2011
+	CodeNoSuchOrder  int64 = -2013
+)
+
+// IsUnknownOrder returns true if err carries the -2011 UNKNOWN_ORDER or
+// -2013 NO_SUCH_ORDER exchange code. For cancel operations this means the
+// order is already gone, which callers usually treat as success.
+func IsUnknownOrder(err error) bool {
+	var e *Error
+	if errors.As(err, &e) {
+		return e.AsterCode == CodeUnknownOrder || e.AsterCode == CodeNoSuchOrder
+	}
+	return false
+}
+
 func matchKind(err error, kind ErrorKind) bool {
 	var e *Error
 	if errors.As(err, &e) {
@@ -118,7 +139,8 @@ MapAsterCode returns the SDK error category for a specific Aster error code.
 Covered groups (codes follow the Binance Futures convention):
   - -1003 TOO_MANY_REQUESTS, -1015 TOO_MANY_ORDERS         — rate limit;
   - -1002 UNAUTHORIZED, -1022 INVALID_SIGNATURE,
-    -2014 BAD_API_KEY_FMT, -2015 REJECTED_MBX_KEY          — authentication;
+    -2014 BAD_API_KEY_FMT, -2015 REJECTED_MBX_KEY,
+    -5050 DEPOSIT_REQUIRED (master wallet has not deposited) — authentication;
   - -1001 DISCONNECTED, -1006 UNEXPECTED_RESP, -1007 TIMEOUT,
     -1016 SERVICE_SHUTTING_DOWN                            — network/server side;
   - -11xx (params), -1013/-1014/-1020/-1023,
@@ -133,7 +155,11 @@ func MapAsterCode(code int64, msg string) ErrorKind {
 		return ErrorKindUnknown
 	case code == -1003 || code == -1015:
 		return ErrorKindRateLimit
-	case code == -1002 || code == -1022 || code == -2014 || code == -2015:
+	case code == -1002 || code == -1022 || code == -2014 || code == -2015 || code == -5050:
+		// -5050 DEPOSIT_REQUIRED (exchange rule since 2026-09-01): the master
+		// wallet has not completed a deposit, so every TRADE/USER_DATA request
+		// is rejected until it does. Non-retryable, needs operator action —
+		// classified with the credential-level rejections.
 		return ErrorKindAuth
 	case code == -1001 || code == -1006 || code == -1007 || code == -1016:
 		return ErrorKindNetwork

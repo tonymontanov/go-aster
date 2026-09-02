@@ -26,8 +26,11 @@ AUTHENTICATION:
 Aster V3 uses the API Wallet / Agent model instead of API key + HMAC. Every
 private request carries `signer` (API wallet address), `nonce` (microseconds)
 and an EIP-712 signature produced by the API wallet private key (domain
-"AsterSignTransaction", chainId 1666). Create an API wallet at
-https://www.asterdex.com/en/api-wallet (Pro API).
+"AsterSignTransaction", chainId 1666 on mainnet / 714 on testnet — chosen
+automatically from Config.Testnet). Create an API wallet at
+https://www.asterdex.com/en/api-wallet (Pro API). Since 2026-09-01 the
+master wallet must have completed a deposit, otherwise every private call
+fails with -5050 DEPOSIT_REQUIRED.
 
 QUICK START:
 
@@ -55,7 +58,9 @@ QUICK START:
 
 PERFORMANCE NOTES:
   - one shared HTTP connection pool, one market WS connection per section;
-  - json-iterator on all hot paths, two-stage decoding via RawMessage;
+  - json-iterator (case-sensitive config — the wire format relies on
+    e/E, U/u, b/B key pairs) on all hot paths, two-stage decoding via
+    RawMessage;
   - prices/quantities are shopspring/decimal end to end;
   - the EIP-712 domain separator is precomputed once; a request signature
     costs three keccak hashes + one deterministic ECDSA sign.
