@@ -9,7 +9,8 @@ show an advantage.
 
 MAIN FUNCTIONS:
   - Marshal/Unmarshal     — wrappers over the selected parser (json-iterator,
-                            ConfigCompatibleWithStandardLibrary).
+                            standard-library-compatible settings + CaseSensitive
+                            field matching, see the `json` var below).
   - NewDecoder            — wrapper for streaming parsing (REST response body).
   - ParseDecimal          — string → decimal.Decimal. An empty string is treated
                             as decimal.Zero (Aster, like Binance, sends numeric
@@ -33,11 +34,22 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// json — reusable parser instance. ConfigCompatibleWithStandardLibrary matters because:
-//   - correctly handles float64 (json-iterator default truncates precision);
-//   - behaviorally compatible with standard library test expectations;
-//   - still ~4x faster than encoding/json for our use case.
-var json = jsoniter.ConfigCompatibleWithStandardLibrary
+// json — reusable parser instance. Same settings as
+// ConfigCompatibleWithStandardLibrary (exact float64 handling, sorted map
+// keys, validated RawMessage) PLUS CaseSensitive field matching.
+//
+// CaseSensitive is mandatory for the Aster/Binance wire format: WS payloads
+// use single-letter keys that differ only by case — "e"/"E" (event type /
+// event time), "U"/"u" (first / final update id), "b"/"B" (bid price / qty),
+// "s"/"S" (symbol / side) and so on. With case-insensitive matching (the
+// jsoniter default, inherited from encoding/json) both keys resolve to ONE
+// struct field and decoding fails with "readUint64: unexpected character".
+var json = jsoniter.Config{
+	EscapeHTML:             true,
+	SortMapKeys:            true,
+	ValidateJsonRawMessage: true,
+	CaseSensitive:          true,
+}.Froze()
 
 // RawMessage — analogue of json.RawMessage that works correctly with jsoniter.
 // Used as a field in envelope structs to avoid parsing data twice:

@@ -9,12 +9,20 @@ MAX_NUM_ORDERS) into named fields so that callers do not parse filter objects.
 
 NOTE:
 PricePrecision/QuantityPrecision are DISPLAY precisions; per the Aster docs
-they must NOT be used as tickSize/stepSize — use TickSize/StepSize.
+they must NOT be used as tickSize/stepSize — use TickSize/StepSize. On the
+live exchange the two disagree for most symbols (e.g. BSBUSDT:
+pricePrecision=7 while tickSize=0.00001), so a price rounded to
+PricePrecision is rejected with -4014 "Price not increased by tick size".
+Use PriceDecimals()/QuantityDecimals() when a rounding precision is needed.
 */
 
 package types
 
-import "github.com/shopspring/decimal"
+import (
+	"strings"
+
+	"github.com/shopspring/decimal"
+)
 
 // SymbolInfo — trading rules and precision for one symbol.
 type SymbolInfo struct {
@@ -62,4 +70,37 @@ type SymbolInfo struct {
 	OrderTypes []OrderType
 	// TimeInForce — TIF values allowed for the symbol.
 	TimeInForce []TimeInForceType
+}
+
+// PriceDecimals returns the number of decimal places of TickSize — the
+// precision a price must be rounded to so that it stays a multiple of the
+// tick (0.00001 → 5, 0.1 → 1, 1 → 0). Falls back to the display
+// PricePrecision when the PRICE_FILTER is absent (TickSize is zero).
+func (s SymbolInfo) PriceDecimals() int {
+	if s.TickSize.IsZero() {
+		return s.PricePrecision
+	}
+	return decimalPlaces(s.TickSize)
+}
+
+// QuantityDecimals returns the number of decimal places of StepSize
+// (LOT_SIZE) — the precision a quantity must be rounded to. Falls back to
+// the display QuantityPrecision when the LOT_SIZE filter is absent.
+func (s SymbolInfo) QuantityDecimals() int {
+	if s.StepSize.IsZero() {
+		return s.QuantityPrecision
+	}
+	return decimalPlaces(s.StepSize)
+}
+
+// decimalPlaces counts significant decimal places of d. decimal.String()
+// trims trailing zeros ("0.0000100" → "0.00001"), so wire padding does not
+// inflate the result.
+func decimalPlaces(d decimal.Decimal) int {
+	var text string = d.String()
+	var dot int = strings.IndexByte(text, '.')
+	if dot < 0 {
+		return 0
+	}
+	return len(text) - dot - 1
 }

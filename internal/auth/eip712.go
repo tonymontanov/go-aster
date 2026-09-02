@@ -48,10 +48,14 @@ const (
 	eip712DomainVer  = "1"
 	eip712MsgType    = "Message(string msg)"
 
-	// DefaultChainID — chainId of the Aster EIP-712 signing domain. The value
-	// 1666 is fixed in the Aster V3 documentation for both mainnet and testnet
-	// trading endpoints.
+	// DefaultChainID — chainId of the PRODUCTION Aster EIP-712 signing domain
+	// (official V3 docs, mainnet reference). NewSigner uses it when chainID
+	// is 0.
 	DefaultChainID int64 = 1666
+	// TestnetChainID — chainId of the TESTNET signing domain (official V3
+	// testnet docs and the reference aster-code.py sample). Selected by the
+	// root Config when Testnet is set and ChainID is left 0.
+	TestnetChainID int64 = 714
 )
 
 // eip712Domain holds the precomputed hashes of the fixed Aster signing schema.

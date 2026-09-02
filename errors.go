@@ -45,6 +45,11 @@ func IsAuth(err error) bool           { return asterr.IsAuth(err) }
 func IsInvalidRequest(err error) bool { return asterr.IsInvalidRequest(err) }
 func IsExchange(err error) bool       { return asterr.IsExchange(err) }
 
+// IsUnknownOrder reports whether err carries the -2011 UNKNOWN_ORDER or
+// -2013 NO_SUCH_ORDER exchange code: the order is already gone (filled,
+// cancelled or never accepted). Cancel callers usually treat it as success.
+func IsUnknownOrder(err error) bool { return asterr.IsUnknownOrder(err) }
+
 // MapAsterCode returns the SDK error category for an exchange code.
 func MapAsterCode(code int64, msg string) ErrorKind { return asterr.MapAsterCode(code, msg) }
 
