@@ -165,8 +165,15 @@ type WsConfig struct {
 	HandshakeTimeout time.Duration
 	// ReadTimeout — read deadline for a single frame. The Aster server sends a
 	// ping frame every 5 minutes, so on a quiet stream (user data) the deadline
-	// is refreshed at least that often. Default: 6m.
+	// is refreshed at least that often. Default: 6m. With PingInterval set,
+	// every client ping is answered by a pong that refreshes the deadline, so
+	// ReadTimeout = PingInterval + a few seconds detects a stalled connection
+	// (socket open, nothing arriving) within seconds.
 	ReadTimeout time.Duration
+	// PingInterval — client ping (WebSocket control frame) cadence. Zero —
+	// the client does not ping and liveness relies on server pings and
+	// ReadTimeout alone. Default: 0.
+	PingInterval time.Duration
 	// WriteTimeout — write timeout for a single frame. Default: 5s.
 	WriteTimeout time.Duration
 	// ReconnectInitialBackoff — initial delay between reconnect attempts. Default: 200ms.

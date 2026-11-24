@@ -74,6 +74,7 @@ func toWsConfig(cfg aster.Config) ws.Config {
 	return ws.Config{
 		HandshakeTimeout:        cfg.WS.HandshakeTimeout,
 		ReadTimeout:             cfg.WS.ReadTimeout,
+		PingInterval:            cfg.WS.PingInterval,
 		WriteTimeout:            cfg.WS.WriteTimeout,
 		ReconnectInitialBackoff: cfg.WS.ReconnectInitialBackoff,
 		ReconnectMaxBackoff:     cfg.WS.ReconnectMaxBackoff,

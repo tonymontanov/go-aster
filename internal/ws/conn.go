@@ -18,6 +18,9 @@ RELIABILITY:
     streams are re-subscribed in batches;
   - server pings (every ~5 min) are answered with pongs and refresh the read
     deadline; any received frame refreshes it too;
+  - optional client pings (Config.PingInterval): the server's pong refreshes
+    the read deadline, so a ReadTimeout a few seconds above the ping interval
+    detects a stalled connection (socket open, nothing arriving) quickly;
   - the exchange caps client message rate at 10/s — control frames are paced
     by Config.SubscribeInterval and batched by Config.SubscribeBatchSize.
 
@@ -55,6 +58,7 @@ var ErrConnClosed = errors.New("ws: connection closed")
 type Config struct {
 	HandshakeTimeout        time.Duration
 	ReadTimeout             time.Duration
+	PingInterval            time.Duration
 	WriteTimeout            time.Duration
 	ReconnectInitialBackoff time.Duration
 	ReconnectMaxBackoff     time.Duration
@@ -161,6 +165,18 @@ func (c *Conn) Close() {
 }
 
 // Kick closes the CURRENT socket (if any) without terminating the Conn: the
+// healthyConnectionSpan — a connection that lived at least this long is
+// considered healthy: the next disconnect starts the backoff ladder from the
+// beginning. Without it the backoff only grew over the process lifetime, and
+// after a handful of reconnects every later one waited ReconnectMaxBackoff.
+const healthyConnectionSpan time.Duration = 30 * time.Second
+
+// connectionWasHealthy reports whether a connection that lived for lived
+// resets the reconnect backoff.
+func connectionWasHealthy(lived time.Duration) bool {
+	return lived >= healthyConnectionSpan
+}
+
 // supervise loop redials immediately with a fresh URL from urlFn. Used by the
 // user-data stream on listenKeyExpired to rotate the listenKey.
 func (c *Conn) Kick() {
@@ -235,9 +251,15 @@ func (c *Conn) supervise(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
+		var started time.Time = time.Now()
 		var err error = c.connectAndRun(ctx)
 		if ctx.Err() != nil {
 			return
+		}
+		// A connection that lived long enough was healthy: restart the
+		// backoff ladder instead of continuing from an outage long ago.
+		if connectionWasHealthy(time.Since(started)) {
+			backoff = c.cfg.ReconnectInitialBackoff
 		}
 		if err != nil {
 			c.logger.Warn("ws: connection error, will reconnect", asterlog.Err(err))
@@ -332,6 +354,9 @@ func (c *Conn) connectAndRun(ctx context.Context) error {
 		case <-watchDone:
 		}
 	}()
+	if c.cfg.PingInterval > 0 {
+		go c.pingLoop(socket, watchDone)
+	}
 
 	return c.readLoop(socket)
 }
@@ -362,6 +387,28 @@ func (c *Conn) resubscribe(socket *websocket.Conn, subs []*Subscription) error {
 		}
 	}
 	return nil
+}
+
+// pingLoop sends a WebSocket ping every PingInterval until done is closed.
+// The server's pong refreshes the read deadline (pong handler); a failed
+// write closes the socket so the read loop returns and supervise redials.
+func (c *Conn) pingLoop(socket *websocket.Conn, done <-chan struct{}) {
+	var ticker *time.Ticker = time.NewTicker(c.cfg.PingInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+		}
+		c.writeMu.Lock()
+		var err error = socket.WriteControl(websocket.PingMessage, nil, time.Now().Add(c.cfg.WriteTimeout))
+		c.writeMu.Unlock()
+		if err != nil {
+			_ = socket.Close()
+			return
+		}
+	}
 }
 
 // readLoop reads and dispatches frames until the socket dies.
