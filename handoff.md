@@ -89,6 +89,12 @@ Key protocol facts (versus Binance Futures, which Aster V3 copies):
 
 ## Roadmap
 
+- ✅ **v1.1.0** (2026-11-24) — connection liveness: optional client ping
+  (`WsConfig.PingInterval`, WS control frame; the pong refreshes the read deadline, default 0 =
+  previous behaviour); REST HTTP/2 health check (PING after 1 s without incoming frames, closed if
+  unanswered in 2 s); reconnect backoff restarts after a connection that lived ≥ 30 s. The desk
+  core sets `WS.PingInterval` 5 s + `WS.ReadTimeout` 8 s (Aster answers pings in ~0.33 s).
+
 Done ✅
 - Repo renamed aster-go → go-aster (GitHub + local symlink `aster-go`).
 - Root package (Client/Config/aliases/RateLimitEvent).
